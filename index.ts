@@ -12,39 +12,56 @@ interface Circle {
 }
 
 const POP_SIZE = 75;
+let absorbSpeed = 0.1;
+let popSize = POP_SIZE;
+const INITIAL_PLAYER = {
+  x: canvasBounds.width / 2,
+  y: canvasBounds.height / 2,
+  r: 25,
+  vx: 0,
+  vy: 0,
+  player: true,
+};
 
-let circles: Circle[] = [
+let circles: Circle[] = [];
+
+interface Level {
+  absorbSpeed: number;
+  initialCircles: number[];
+}
+
+const LEVELS: Level[] = [
   {
-    x: canvasBounds.width / 2,
-    y: canvasBounds.height / 2,
-    r: 25,
-    vx: 0,
-    vy: 0,
-    player: true,
+    absorbSpeed: 0.1,
+    initialCircles: [],
   },
+  {
+    absorbSpeed: 0.1,
+    initialCircles: [10],
+  },
+  //    (POP_SIZE - 25) / 3,
+  //    (POP_SIZE - 25) / 3,
+  //    (POP_SIZE - 25) / 3,
+  //    (POP_SIZE - 25) / 3,
 ];
-
-const LEVELS = [
-  [
-    //    (POP_SIZE - 25) / 3,
-    //    (POP_SIZE - 25) / 3,
-    //    (POP_SIZE - 25) / 3,
-    //    (POP_SIZE - 25) / 3,
-  ],
-];
-let currentLevel = 0;
+let currentLevel = -1;
 
 //*
-for (let i = 0; i < LEVELS[currentLevel].length; i++) {
-  circles.push({
-    x: Math.random() * canvasBounds.width,
-    y: Math.random() * canvasBounds.height,
-    r: LEVELS[currentLevel][i],
-    vx: Math.random(),
-    vy: Math.random(),
-    player: false,
-  });
+function initializeNextLevel() {
+  currentLevel++;
+  for (let i = 0; i < LEVELS[currentLevel].initialCircles.length; i++) {
+    circles.push({
+      x: Math.random() * canvasBounds.width,
+      y: Math.random() * canvasBounds.height,
+      r: LEVELS[currentLevel].initialCircles[i],
+      vx: Math.random(),
+      vy: Math.random(),
+      player: false,
+    });
+  }
+  circles.push(INITIAL_PLAYER);
 }
+initializeNextLevel();
 // */
 
 let mousePos = { x: 0, y: 0 };
@@ -87,11 +104,12 @@ function spawnPopCircle(c: Circle, dx: number, dy: number) {
 const INV_CONTROLS = -1;
 
 function popCircle(big: Circle, smallIndex: number) {
-  let eaten = 0.1;
-  if (circles[smallIndex].r < 0.2) eaten = 0.2;
-  big.r += 0.1;
-  circles[smallIndex].r -= 0.1;
-  if (big.r > POP_SIZE) {
+  let absorb = big.player ? absorbSpeed : LEVELS[currentLevel].absorbSpeed;
+  let pSize = big.player ? popSize : POP_SIZE;
+  if (circles[smallIndex].r < 0.2) absorb = 0.2;
+  big.r += absorb;
+  circles[smallIndex].r -= absorb;
+  if (big.r > pSize) {
     big.r /= 5;
     spawnPopCircle(big, -1, -1);
     spawnPopCircle(big, -1, 1);
@@ -150,12 +168,20 @@ function update() {
       y: canvasBounds.height / 2,
       size: 100,
       text: "Absorb faster",
+      effect: () => {
+        absorbSpeed += 0.1;
+        initializeNextLevel();
+      },
     };
     rightButton = {
       x: canvasBounds.width / 2 + MARGIN,
       y: canvasBounds.height / 2,
       size: 100,
-      text: "Grow bigger",
+      text: "Pop size",
+      effect: () => {
+        popSize += 5;
+        initializeNextLevel();
+      },
     };
   }
 }
@@ -173,7 +199,17 @@ interface Button {
   y: number;
   size: number;
   text: string;
-  effect?: () => void;
+  effect: () => void;
+}
+
+function clicksButton(b: Button | null) {
+  return (
+    b !== null &&
+    b.x <= mousePos.x &&
+    mousePos.x <= b.x + b.size &&
+    b.y <= mousePos.y &&
+    mousePos.y <= b.y + b.size
+  );
 }
 
 function drawButton(b: Button | null) {
@@ -244,6 +280,8 @@ canvasElem.addEventListener(
   "mousedown",
   (evt) => {
     mouseDown = true;
+    if (clicksButton(leftButton)) leftButton?.effect();
+    if (clicksButton(rightButton)) rightButton?.effect();
   },
   false
 );
