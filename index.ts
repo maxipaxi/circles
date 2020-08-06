@@ -23,7 +23,7 @@ let circles: Circle[] = [
 ];
 
 //*
-for (let i = 0; i < 1; i++) {
+for (let i = 0; i < 5; i++) {
   circles.push({
     x: Math.random() * canvasBounds.width,
     y: Math.random() * canvasBounds.height,
@@ -73,6 +73,19 @@ function spawnPopCircle(c: Circle, dx: number, dy: number) {
 
 const INV_CONTROLS = -1;
 
+function popCircle(big: Circle, smallIndex: number) {
+  big.r += 0.1;
+  circles[smallIndex].r -= 0.1;
+  if (big.r > 75) {
+    big.r /= 5;
+    spawnPopCircle(big, -1, -1);
+    spawnPopCircle(big, -1, 1);
+    spawnPopCircle(big, 1, -1);
+    spawnPopCircle(big, 1, 1);
+  }
+  if (circles[smallIndex].r <= 0) circles.splice(smallIndex, 1);
+}
+
 function update() {
   while (inputs.length > 0) {
     let i = inputs.shift()!;
@@ -104,24 +117,10 @@ function update() {
   for (let i = 0; i < circles.length; i++) {
     for (let j = i + 1; j < circles.length; j++) {
       if (collides(circles[i], circles[j])) {
-        let ri = circles[i].r;
-        let rj = circles[j].r;
-        if (ri > rj) {
-          circles[i].r += 0.1;
-          circles[j].r -= 0.1;
-          if (circles[i].r > 75) {
-            circles[i].r /= 5;
-            spawnPopCircle(circles[i], -1, -1);
-            spawnPopCircle(circles[i], -1, 1);
-            spawnPopCircle(circles[i], 1, -1);
-            spawnPopCircle(circles[i], 1, 1);
-          }
-          if (circles[j].r <= 0) circles.splice(j, 1);
+        if (circles[i].r > circles[j].r) {
+          popCircle(circles[i], j);
         } else {
-          circles[i].r -= 0.1;
-          circles[j].r += 0.1;
-          if (circles[j].r > 75) circles[j].r = circles[j].r / 5;
-          if (circles[i].r <= 0) circles.splice(i, 1);
+          popCircle(circles[j], i);
         }
       }
     }
