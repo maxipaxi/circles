@@ -2,6 +2,54 @@ let canvasElem = document.getElementById("canvas") as HTMLCanvasElement;
 let canvasBounds = canvasElem.getBoundingClientRect();
 let ctx = canvasElem.getContext("2d")!;
 
+interface GameMode {
+  handleClick(): void;
+  draw(): void;
+  update(): void;
+}
+class YouWinScreen implements GameMode {
+  private leftButton: Button;
+  private rightButton: Button;
+  constructor() {
+    this.leftButton = randomBonusButton(-1);
+    this.rightButton = randomBonusButton(1);
+  }
+  handleClick() {
+    if (clicksButton(this.leftButton)) this.leftButton?.bonus.effect();
+    if (clicksButton(this.rightButton)) this.rightButton?.bonus.effect();
+  }
+  draw() {
+    ctx.font = "30px Comic Sans MS";
+    let met = ctx.measureText("You won! Woo");
+    ctx.fillText(
+      "You won! Woo",
+      (canvasBounds.width - met.width) / 2,
+      canvasBounds.height / 2 - 30
+    );
+
+    drawButton(this.leftButton);
+    drawButton(this.rightButton);
+  }
+  update() {}
+}
+class Playing implements GameMode {
+  handleClick() {}
+  draw() {
+    circles.forEach((c) => {
+      if (c.isPlayer()) ctx.strokeStyle = "#0000ff";
+      else ctx.strokeStyle = "#ff0000";
+      c.draw();
+    });
+  }
+  update() {
+    handleInput();
+    updateCircles();
+    checkCollisions();
+    checkWinning();
+  }
+}
+let currentGameMode: GameMode = new Playing();
+
 class Circle {
   constructor(
     private x: number,
@@ -133,11 +181,10 @@ const LEVELS: Level[] = [
   },
 ];
 let currentLevel = -1;
-let leftButton: Button | null = null;
-let rightButton: Button | null = null;
 
 function initializeNextLevel() {
   currentLevel++;
+  circles = [];
   for (let i = 0; i < LEVELS[currentLevel].initialCircles.length; i++) {
     circles.push(
       new Circle(
@@ -151,8 +198,7 @@ function initializeNextLevel() {
     );
   }
   circles.push(INITIAL_PLAYER.copy());
-  leftButton = null;
-  rightButton = null;
+  currentGameMode = new Playing();
 }
 initializeNextLevel();
 
@@ -203,41 +249,6 @@ function clamp(x: number, min: number, max: number) {
 
 const INV_CONTROLS = -1;
 
-function update() {
-  if (mouseDown) {
-    for (let ci = 0; ci < circles.length; ci++) {
-      let c = circles[ci];
-      c.thrustIfPlayer();
-    }
-  }
-  circles.forEach((c) => {
-    c.update();
-  });
-  for (let i = 0; i < circles.length; i++) {
-    for (let j = i + 1; j < circles.length; j++) {
-      if (circles[i].collidesWith(circles[j])) {
-        circles[i].handleCollision(i, j);
-      }
-    }
-  }
-  let hasWon = circles.every((c) => c.isPlayer());
-  if (hasWon && circles.length > 0) {
-    circles = [];
-    leftButton = {
-      x: canvasBounds.width / 2 - 50 - MARGIN,
-      y: canvasBounds.height / 2 + 45,
-      r: 50,
-      bonus: BONUSES[~~(Math.random() * BONUSES.length)],
-    };
-    rightButton = {
-      x: canvasBounds.width / 2 + 50 + MARGIN,
-      y: canvasBounds.height / 2 + 45,
-      r: 50,
-      bonus: BONUSES[~~(Math.random() * BONUSES.length)],
-    };
-  }
-}
-
 const MARGIN = 10;
 
 interface Button {
@@ -247,12 +258,56 @@ interface Button {
   bonus: Bonus;
 }
 
-function clicksButton(b: Button | null) {
-  return b !== null && Math.hypot(b.x - mousePos.x, b.y - mousePos.y) < b.r;
+function checkWinning() {
+  let hasWon = circles.every((c) => c.isPlayer());
+  if (hasWon && circles.length > 0) {
+    handleWinning();
+  }
 }
 
-function drawButton(b: Button | null) {
-  if (b === null) return;
+function handleWinning() {
+  currentGameMode = new YouWinScreen();
+}
+
+function randomBonusButton(left: number) {
+  return {
+    x: canvasBounds.width / 2 - left * (50 + MARGIN),
+    y: canvasBounds.height / 2 + 45,
+    r: 50,
+    bonus: BONUSES[~~(Math.random() * BONUSES.length)],
+  };
+}
+
+function checkCollisions() {
+  for (let i = 0; i < circles.length; i++) {
+    for (let j = i + 1; j < circles.length; j++) {
+      if (circles[i].collidesWith(circles[j])) {
+        circles[i].handleCollision(i, j);
+      }
+    }
+  }
+}
+
+function updateCircles() {
+  circles.forEach((c) => {
+    c.update();
+  });
+}
+
+function handleInput() {
+  if (mouseDown) {
+    for (let ci = 0; ci < circles.length; ci++) {
+      let c = circles[ci];
+      c.thrustIfPlayer();
+    }
+  }
+}
+
+function clicksButton(b: Button) {
+  return Math.hypot(b.x - mousePos.x, b.y - mousePos.y) < b.r;
+}
+
+function drawButton(b: Button) {
   ctx.strokeStyle = "#000000";
   ctx.font = "15px Comic Sans MS";
   let met = ctx.measureText(b.bonus.name);
@@ -264,24 +319,7 @@ function drawButton(b: Button | null) {
 
 function draw() {
   ctx.clearRect(0, 0, canvasBounds.width, canvasBounds.height);
-  if (circles.length == 0) {
-    ctx.font = "30px Comic Sans MS";
-    let met = ctx.measureText("You won! Woo");
-    ctx.fillText(
-      "You won! Woo",
-      (canvasBounds.width - met.width) / 2,
-      canvasBounds.height / 2 - 30
-    );
-
-    drawButton(leftButton);
-    drawButton(rightButton);
-  } else {
-    circles.forEach((c) => {
-      if (c.isPlayer()) ctx.strokeStyle = "#0000ff";
-      else ctx.strokeStyle = "#ff0000";
-      c.draw();
-    });
-  }
+  currentGameMode.draw();
 }
 
 const FPS = 30;
@@ -289,7 +327,7 @@ const SLEEP = 1000 / FPS;
 
 function gameLoop() {
   let before = Date.now();
-  update();
+  currentGameMode.update();
   draw();
   let after = Date.now();
   let sleep = SLEEP - (after - before);
@@ -321,8 +359,7 @@ canvasElem.addEventListener(
   "mousedown",
   (evt) => {
     mouseDown = true;
-    if (clicksButton(leftButton)) leftButton?.bonus.effect();
-    if (clicksButton(rightButton)) rightButton?.bonus.effect();
+    currentGameMode.handleClick();
   },
   false
 );
