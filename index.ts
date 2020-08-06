@@ -39,14 +39,15 @@ const LEVELS: Level[] = [
     absorbSpeed: 0.1,
     initialCircles: [10],
   },
-  //    (POP_SIZE - 25) / 3,
-  //    (POP_SIZE - 25) / 3,
-  //    (POP_SIZE - 25) / 3,
-  //    (POP_SIZE - 25) / 3,
+  {
+    absorbSpeed: 0.1,
+    initialCircles: [15, 15, 15, 15],
+  },
 ];
 let currentLevel = -1;
+let leftButton: Button | null = null;
+let rightButton: Button | null = null;
 
-//*
 function initializeNextLevel() {
   currentLevel++;
   for (let i = 0; i < LEVELS[currentLevel].initialCircles.length; i++) {
@@ -59,10 +60,33 @@ function initializeNextLevel() {
       player: false,
     });
   }
-  circles.push(INITIAL_PLAYER);
+  circles.push({ ...INITIAL_PLAYER });
+  leftButton = null;
+  rightButton = null;
 }
 initializeNextLevel();
-// */
+
+interface Bonus {
+  name: string;
+  effect: () => void;
+}
+
+const BONUSES = [
+  {
+    name: "Absorb faster",
+    effect: () => {
+      absorbSpeed += 0.1;
+      initializeNextLevel();
+    },
+  },
+  {
+    name: "Pop size",
+    effect: () => {
+      popSize += 5;
+      initializeNextLevel();
+    },
+  },
+];
 
 let mousePos = { x: 0, y: 0 };
 let mouseDown = false;
@@ -119,9 +143,6 @@ function popCircle(big: Circle, smallIndex: number) {
   if (circles[smallIndex].r <= 0) circles.splice(smallIndex, 1);
 }
 
-let leftButton: Button | null = null;
-let rightButton: Button | null = null;
-
 function update() {
   if (mouseDown) {
     for (let ci = 0; ci < circles.length; ci++) {
@@ -164,24 +185,16 @@ function update() {
   if (hasWon) {
     circles = [];
     leftButton = {
-      x: canvasBounds.width / 2 - 100 - MARGIN,
-      y: canvasBounds.height / 2,
-      size: 100,
-      text: "Absorb faster",
-      effect: () => {
-        absorbSpeed += 0.1;
-        initializeNextLevel();
-      },
+      x: canvasBounds.width / 2 - 50 - MARGIN,
+      y: canvasBounds.height / 2 + 45,
+      r: 50,
+      bonus: BONUSES[0],
     };
     rightButton = {
-      x: canvasBounds.width / 2 + MARGIN,
-      y: canvasBounds.height / 2,
-      size: 100,
-      text: "Pop size",
-      effect: () => {
-        popSize += 5;
-        initializeNextLevel();
-      },
+      x: canvasBounds.width / 2 + 50 + MARGIN,
+      y: canvasBounds.height / 2 + 45,
+      r: 50,
+      bonus: BONUSES[1],
     };
   }
 }
@@ -197,28 +210,23 @@ const MARGIN = 10;
 interface Button {
   x: number;
   y: number;
-  size: number;
-  text: string;
-  effect: () => void;
+  r: number;
+  bonus: Bonus;
 }
 
 function clicksButton(b: Button | null) {
-  return (
-    b !== null &&
-    b.x <= mousePos.x &&
-    mousePos.x <= b.x + b.size &&
-    b.y <= mousePos.y &&
-    mousePos.y <= b.y + b.size
-  );
+  return b !== null && Math.hypot(b.x - mousePos.x, b.y - mousePos.y) < b.r;
 }
 
 function drawButton(b: Button | null) {
   if (b === null) return;
   ctx.strokeStyle = "#000000";
   ctx.font = "15px Comic Sans MS";
-  let met = ctx.measureText(b.text);
-  ctx.strokeRect(b.x, b.y, 100, 100);
-  ctx.fillText(b.text, b.x + (b.size - met.width) / 2, b.y + b.size / 2);
+  let met = ctx.measureText(b.bonus.name);
+  ctx.beginPath();
+  ctx.arc(b.x, b.y, b.r, 0, 2 * Math.PI);
+  ctx.stroke();
+  ctx.fillText(b.bonus.name, b.x - met.width / 2, b.y + 5);
 }
 
 function draw() {
@@ -280,8 +288,8 @@ canvasElem.addEventListener(
   "mousedown",
   (evt) => {
     mouseDown = true;
-    if (clicksButton(leftButton)) leftButton?.effect();
-    if (clicksButton(rightButton)) rightButton?.effect();
+    if (clicksButton(leftButton)) leftButton?.bonus.effect();
+    if (clicksButton(rightButton)) rightButton?.bonus.effect();
   },
   false
 );
