@@ -11,23 +11,27 @@ interface Circle {
   player: boolean;
 }
 
+const POP_SIZE = 75;
+
 let circles: Circle[] = [
   {
-    x: 100,
-    y: 75,
+    x: canvasBounds.width / 2,
+    y: canvasBounds.height / 2,
     r: 25,
-    vx: 1,
-    vy: 0.4,
+    vx: 0,
+    vy: 0,
     player: true,
   },
 ];
+
+const LEVELS = [[]];
 
 //*
 for (let i = 0; i < 5; i++) {
   circles.push({
     x: Math.random() * canvasBounds.width,
     y: Math.random() * canvasBounds.height,
-    r: (Math.random() - Math.random()) * 25 + 25,
+    r: (Math.random() - Math.random()) * 10 + 10,
     vx: Math.random(),
     vy: Math.random(),
     player: false,
@@ -35,7 +39,8 @@ for (let i = 0; i < 5; i++) {
 }
 // */
 
-let inputs: { x: number; y: number }[] = [];
+let mousePos = { x: 0, y: 0 };
+let mouseDown = false;
 
 function clamp(x: number, min: number, max: number) {
   if (x > max) return max;
@@ -74,9 +79,11 @@ function spawnPopCircle(c: Circle, dx: number, dy: number) {
 const INV_CONTROLS = -1;
 
 function popCircle(big: Circle, smallIndex: number) {
+  let eaten = 0.1;
+  if (circles[smallIndex].r < 0.2) eaten = 0.2;
   big.r += 0.1;
   circles[smallIndex].r -= 0.1;
-  if (big.r > 75) {
+  if (big.r > POP_SIZE) {
     big.r /= 5;
     spawnPopCircle(big, -1, -1);
     spawnPopCircle(big, -1, 1);
@@ -87,13 +94,12 @@ function popCircle(big: Circle, smallIndex: number) {
 }
 
 function update() {
-  while (inputs.length > 0) {
-    let i = inputs.shift()!;
+  if (mouseDown) {
     for (let ci = 0; ci < circles.length; ci++) {
       let c = circles[ci];
       if (c.player && c.r > 0.5) {
-        let dx = INV_CONTROLS * (i.x - c.x);
-        let dy = INV_CONTROLS * (i.y - c.y);
+        let dx = INV_CONTROLS * (mousePos.x - c.x);
+        let dy = INV_CONTROLS * (mousePos.y - c.y);
         let dist = Math.hypot(dx, dy);
         let nx = dx / dist;
         let ny = dy / dist;
@@ -157,13 +163,28 @@ function gameLoop() {
 gameLoop();
 
 canvasElem.addEventListener(
-  "click",
+  "mousemove",
   (evt) => {
-    let mousePos = {
+    mousePos = {
       x: evt.clientX - canvasBounds.left,
       y: evt.clientY - canvasBounds.top,
     };
-    inputs.push(mousePos);
+  },
+  false
+);
+
+canvasElem.addEventListener(
+  "mouseup",
+  (evt) => {
+    mouseDown = false;
+  },
+  false
+);
+
+canvasElem.addEventListener(
+  "mousedown",
+  (evt) => {
+    mouseDown = true;
   },
   false
 );
