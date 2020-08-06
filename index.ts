@@ -14,6 +14,7 @@ interface Circle {
 const POP_SIZE = 75;
 let absorbSpeed = 0.1;
 let popSize = POP_SIZE;
+let thrustSpeed = 0.1;
 const INITIAL_PLAYER = {
   x: canvasBounds.width / 2,
   y: canvasBounds.height / 2,
@@ -86,6 +87,20 @@ const BONUSES = [
       initializeNextLevel();
     },
   },
+  {
+    name: "Thrust speed",
+    effect: () => {
+      thrustSpeed += 0.1;
+      initializeNextLevel();
+    },
+  },
+  {
+    name: "Initial size",
+    effect: () => {
+      INITIAL_PLAYER.r += 5;
+      initializeNextLevel();
+    },
+  },
 ];
 
 let mousePos = { x: 0, y: 0 };
@@ -113,7 +128,6 @@ function updateCircle(c: Circle) {
 function collides(c1: Circle, c2: Circle) {
   return Math.hypot(c1.x - c2.x, c1.y - c2.y) < c1.r + c2.r;
 }
-const THRUST = 0.1;
 
 function spawnPopCircle(c: Circle, dx: number, dy: number) {
   circles.push({
@@ -153,8 +167,8 @@ function update() {
         let dist = Math.hypot(dx, dy);
         let nx = dx / dist;
         let ny = dy / dist;
-        c.vx += nx * THRUST;
-        c.vy += ny * THRUST;
+        c.vx += nx * thrustSpeed;
+        c.vy += ny * thrustSpeed;
         c.r -= 0.5;
         circles.push({
           r: 0.5,
@@ -182,19 +196,19 @@ function update() {
     }
   }
   let hasWon = circles.every((c) => c.player);
-  if (hasWon) {
+  if (hasWon && circles.length > 0) {
     circles = [];
     leftButton = {
       x: canvasBounds.width / 2 - 50 - MARGIN,
       y: canvasBounds.height / 2 + 45,
       r: 50,
-      bonus: BONUSES[0],
+      bonus: BONUSES[~~(Math.random() * BONUSES.length)],
     };
     rightButton = {
       x: canvasBounds.width / 2 + 50 + MARGIN,
       y: canvasBounds.height / 2 + 45,
       r: 50,
-      bonus: BONUSES[1],
+      bonus: BONUSES[~~(Math.random() * BONUSES.length)],
     };
   }
 }
