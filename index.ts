@@ -2,27 +2,114 @@ let canvasElem = document.getElementById("canvas") as HTMLCanvasElement;
 let canvasBounds = canvasElem.getBoundingClientRect();
 let ctx = canvasElem.getContext("2d")!;
 
-interface Circle {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  r: number;
-  player: boolean;
+class Circle {
+  constructor(
+    private x: number,
+    private y: number,
+    private vx: number,
+    private vy: number,
+    private r: number,
+    private player: boolean
+  ) {}
+  isPlayer() {
+    return this.player;
+  }
+  copy() {
+    return new Circle(this.x, this.y, this.vx, this.vy, this.r, this.player);
+  }
+  update() {
+    this.x += this.vx;
+    if (this.x - this.r < 0 || this.x + this.r >= canvasBounds.width) {
+      this.vx = -this.vx;
+      this.x = clamp(this.x, 0 + this.r, canvasBounds.width - this.r);
+    }
+    this.y += this.vy;
+    if (this.y - this.r < 0 || this.y + this.r >= canvasBounds.height) {
+      this.vy = -this.vy;
+      this.y = clamp(this.y, 0 + this.r, canvasBounds.height - this.r);
+    }
+  }
+  increaseSize() {
+    this.r += 5;
+  }
+  collidesWith(c2: Circle) {
+    return Math.hypot(this.x - c2.x, this.y - c2.y) < this.r + c2.r;
+  }
+  spawnPopCircle(dx: number, dy: number) {
+    circles.push(
+      new Circle(
+        this.x + 30 * dx,
+        this.y + 30 * dy,
+        dx * Math.random(),
+        dy * Math.random(),
+        this.r,
+        this.player
+      )
+    );
+  }
+  absorb(smallIndex: number) {
+    let pSize = this.player ? popSize : POP_SIZE;
+    let absorb = this.player ? absorbSpeed : LEVELS[currentLevel].absorbSpeed;
+    if (circles[smallIndex].r < 0.2) absorb = 0.2;
+    this.r += absorb;
+    circles[smallIndex].r -= absorb;
+    if (this.r > pSize) {
+      this.r /= 5;
+      this.spawnPopCircle(-1, -1);
+      this.spawnPopCircle(-1, 1);
+      this.spawnPopCircle(1, -1);
+      this.spawnPopCircle(1, 1);
+    }
+    if (circles[smallIndex].r <= 0) circles.splice(smallIndex, 1);
+  }
+  thrustIfPlayer() {
+    if (this.player && this.r > 0.5) {
+      let dx = INV_CONTROLS * (mousePos.x - this.x);
+      let dy = INV_CONTROLS * (mousePos.y - this.y);
+      let dist = Math.hypot(dx, dy);
+      let nx = dx / dist;
+      let ny = dy / dist;
+      this.vx += nx * thrustSpeed;
+      this.vy += ny * thrustSpeed;
+      this.r -= 0.5;
+      circles.push(
+        new Circle(
+          this.x - nx * this.r,
+          this.y - ny * this.r,
+          -this.vx,
+          -this.vy,
+          0.5,
+          true
+        )
+      );
+    }
+  }
+  handleCollision(i: number, j: number) {
+    if (this.r > circles[j].r) {
+      this.absorb(j);
+    } else {
+      circles[j].absorb(i);
+    }
+  }
+  draw() {
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.r, 0, 2 * Math.PI);
+    ctx.stroke();
+  }
 }
 
 const POP_SIZE = 75;
 let absorbSpeed = 0.1;
 let popSize = POP_SIZE;
 let thrustSpeed = 0.1;
-const INITIAL_PLAYER = {
-  x: canvasBounds.width / 2,
-  y: canvasBounds.height / 2,
-  r: 25,
-  vx: 0,
-  vy: 0,
-  player: true,
-};
+const INITIAL_PLAYER = new Circle(
+  canvasBounds.width / 2,
+  canvasBounds.height / 2,
+  0,
+  0,
+  25,
+  true
+);
 
 let circles: Circle[] = [];
 
@@ -52,16 +139,18 @@ let rightButton: Button | null = null;
 function initializeNextLevel() {
   currentLevel++;
   for (let i = 0; i < LEVELS[currentLevel].initialCircles.length; i++) {
-    circles.push({
-      x: Math.random() * canvasBounds.width,
-      y: Math.random() * canvasBounds.height,
-      r: LEVELS[currentLevel].initialCircles[i],
-      vx: Math.random(),
-      vy: Math.random(),
-      player: false,
-    });
+    circles.push(
+      new Circle(
+        Math.random() * canvasBounds.width,
+        Math.random() * canvasBounds.height,
+        Math.random(),
+        Math.random(),
+        LEVELS[currentLevel].initialCircles[i],
+        false
+      )
+    );
   }
-  circles.push({ ...INITIAL_PLAYER });
+  circles.push(INITIAL_PLAYER.copy());
   leftButton = null;
   rightButton = null;
 }
@@ -97,7 +186,7 @@ const BONUSES = [
   {
     name: "Initial size",
     effect: () => {
-      INITIAL_PLAYER.r += 5;
+      INITIAL_PLAYER.increaseSize();
       initializeNextLevel();
     },
   },
@@ -112,90 +201,26 @@ function clamp(x: number, min: number, max: number) {
   return x;
 }
 
-function updateCircle(c: Circle) {
-  c.x += c.vx;
-  if (c.x - c.r < 0 || c.x + c.r >= canvasBounds.width) {
-    c.vx = -c.vx;
-    c.x = clamp(c.x, 0 + c.r, canvasBounds.width - c.r);
-  }
-  c.y += c.vy;
-  if (c.y - c.r < 0 || c.y + c.r >= canvasBounds.height) {
-    c.vy = -c.vy;
-    c.y = clamp(c.y, 0 + c.r, canvasBounds.height - c.r);
-  }
-}
-
-function collides(c1: Circle, c2: Circle) {
-  return Math.hypot(c1.x - c2.x, c1.y - c2.y) < c1.r + c2.r;
-}
-
-function spawnPopCircle(c: Circle, dx: number, dy: number) {
-  circles.push({
-    ...c,
-    x: c.x + 30 * dx,
-    y: c.y + 30 * dy,
-    vx: dx * Math.random(),
-    vy: dy * Math.random(),
-  });
-}
-
 const INV_CONTROLS = -1;
-
-function popCircle(big: Circle, smallIndex: number) {
-  let absorb = big.player ? absorbSpeed : LEVELS[currentLevel].absorbSpeed;
-  let pSize = big.player ? popSize : POP_SIZE;
-  if (circles[smallIndex].r < 0.2) absorb = 0.2;
-  big.r += absorb;
-  circles[smallIndex].r -= absorb;
-  if (big.r > pSize) {
-    big.r /= 5;
-    spawnPopCircle(big, -1, -1);
-    spawnPopCircle(big, -1, 1);
-    spawnPopCircle(big, 1, -1);
-    spawnPopCircle(big, 1, 1);
-  }
-  if (circles[smallIndex].r <= 0) circles.splice(smallIndex, 1);
-}
 
 function update() {
   if (mouseDown) {
     for (let ci = 0; ci < circles.length; ci++) {
       let c = circles[ci];
-      if (c.player && c.r > 0.5) {
-        let dx = INV_CONTROLS * (mousePos.x - c.x);
-        let dy = INV_CONTROLS * (mousePos.y - c.y);
-        let dist = Math.hypot(dx, dy);
-        let nx = dx / dist;
-        let ny = dy / dist;
-        c.vx += nx * thrustSpeed;
-        c.vy += ny * thrustSpeed;
-        c.r -= 0.5;
-        circles.push({
-          r: 0.5,
-          x: c.x - nx * c.r,
-          y: c.y - ny * c.r,
-          vx: -c.vx,
-          vy: -c.vy,
-          player: true,
-        });
-      }
+      c.thrustIfPlayer();
     }
   }
   circles.forEach((c) => {
-    updateCircle(c);
+    c.update();
   });
   for (let i = 0; i < circles.length; i++) {
     for (let j = i + 1; j < circles.length; j++) {
-      if (collides(circles[i], circles[j])) {
-        if (circles[i].r > circles[j].r) {
-          popCircle(circles[i], j);
-        } else {
-          popCircle(circles[j], i);
-        }
+      if (circles[i].collidesWith(circles[j])) {
+        circles[i].handleCollision(i, j);
       }
     }
   }
-  let hasWon = circles.every((c) => c.player);
+  let hasWon = circles.every((c) => c.isPlayer());
   if (hasWon && circles.length > 0) {
     circles = [];
     leftButton = {
@@ -211,12 +236,6 @@ function update() {
       bonus: BONUSES[~~(Math.random() * BONUSES.length)],
     };
   }
-}
-
-function drawCircle(c: Circle) {
-  ctx.beginPath();
-  ctx.arc(c.x, c.y, c.r, 0, 2 * Math.PI);
-  ctx.stroke();
 }
 
 const MARGIN = 10;
@@ -258,9 +277,9 @@ function draw() {
     drawButton(rightButton);
   } else {
     circles.forEach((c) => {
-      if (c.player) ctx.strokeStyle = "#0000ff";
+      if (c.isPlayer()) ctx.strokeStyle = "#0000ff";
       else ctx.strokeStyle = "#ff0000";
-      drawCircle(c);
+      c.draw();
     });
   }
 }
