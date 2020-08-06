@@ -24,14 +24,22 @@ let circles: Circle[] = [
   },
 ];
 
-const LEVELS = [[]];
+const LEVELS = [
+  [
+    //    (POP_SIZE - 25) / 3,
+    //    (POP_SIZE - 25) / 3,
+    //    (POP_SIZE - 25) / 3,
+    //    (POP_SIZE - 25) / 3,
+  ],
+];
+let currentLevel = 0;
 
 //*
-for (let i = 0; i < 5; i++) {
+for (let i = 0; i < LEVELS[currentLevel].length; i++) {
   circles.push({
     x: Math.random() * canvasBounds.width,
     y: Math.random() * canvasBounds.height,
-    r: (Math.random() - Math.random()) * 10 + 10,
+    r: LEVELS[currentLevel][i],
     vx: Math.random(),
     vy: Math.random(),
     player: false,
@@ -93,6 +101,9 @@ function popCircle(big: Circle, smallIndex: number) {
   if (circles[smallIndex].r <= 0) circles.splice(smallIndex, 1);
 }
 
+let leftButton: Button | null = null;
+let rightButton: Button | null = null;
+
 function update() {
   if (mouseDown) {
     for (let ci = 0; ci < circles.length; ci++) {
@@ -131,6 +142,22 @@ function update() {
       }
     }
   }
+  let hasWon = circles.every((c) => c.player);
+  if (hasWon) {
+    circles = [];
+    leftButton = {
+      x: canvasBounds.width / 2 - 100 - MARGIN,
+      y: canvasBounds.height / 2,
+      size: 100,
+      text: "Absorb faster",
+    };
+    rightButton = {
+      x: canvasBounds.width / 2 + MARGIN,
+      y: canvasBounds.height / 2,
+      size: 100,
+      text: "Grow bigger",
+    };
+  }
 }
 
 function drawCircle(c: Circle) {
@@ -139,13 +166,45 @@ function drawCircle(c: Circle) {
   ctx.stroke();
 }
 
+const MARGIN = 10;
+
+interface Button {
+  x: number;
+  y: number;
+  size: number;
+  text: string;
+  effect?: () => void;
+}
+
+function drawButton(b: Button | null) {
+  if (b === null) return;
+  ctx.strokeStyle = "#000000";
+  ctx.font = "15px Comic Sans MS";
+  let met = ctx.measureText(b.text);
+  ctx.strokeRect(b.x, b.y, 100, 100);
+  ctx.fillText(b.text, b.x + (b.size - met.width) / 2, b.y + b.size / 2);
+}
+
 function draw() {
   ctx.clearRect(0, 0, canvasBounds.width, canvasBounds.height);
-  circles.forEach((c) => {
-    if (c.player) ctx.strokeStyle = "#0000ff";
-    else ctx.strokeStyle = "#ff0000";
-    drawCircle(c);
-  });
+  if (circles.length == 0) {
+    ctx.font = "30px Comic Sans MS";
+    let met = ctx.measureText("You won! Woo");
+    ctx.fillText(
+      "You won! Woo",
+      (canvasBounds.width - met.width) / 2,
+      canvasBounds.height / 2 - 30
+    );
+
+    drawButton(leftButton);
+    drawButton(rightButton);
+  } else {
+    circles.forEach((c) => {
+      if (c.player) ctx.strokeStyle = "#0000ff";
+      else ctx.strokeStyle = "#ff0000";
+      drawCircle(c);
+    });
+  }
 }
 
 const FPS = 30;
